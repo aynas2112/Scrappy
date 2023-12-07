@@ -1,4 +1,4 @@
-<!-- ./templates/index.html -->
+<!--./templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,5 +13,10 @@
         <input type="text" id="brand_name" name="brand_name" required>
         <button type="submit">Search</button>
     </form>
+    <!-- {% if csv_filename %}
+        <a href="{{ url_for('download', csv_filename=csv_filename) }}" download>
+            <button>Download CSV</button>
+        </a>
+    {% endif %} -->
 </body>
 </html>
