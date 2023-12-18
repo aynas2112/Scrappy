@@ -1,3 +1,4 @@
+import re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -7,6 +8,13 @@ from selenium.common.exceptions import TimeoutException
 from bs4 import BeautifulSoup
 import pandas as pd
 import os
+
+def extract_star_rating_from_review(review_text):
+    # Use a regular expression to find star ratings in the review text
+    match = re.search(r'(\d+(\.\d+)?)\s*stars?', review_text, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return 'N/A'
 
 def scrape_search_results(brand_name):
     driver = webdriver.Chrome()
@@ -34,12 +42,13 @@ def scrape_search_results(brand_name):
             for result in soup.find_all('li', {'class': 'b_algo'}):
                 name = result.find('h2')
                 snippet = result.find('div', {'class': 'b_caption'})
-                rating = result.find('div', {'class': 'b_vPanel'})
+                rating_element = result.find('div', {'class': 'b_vPanel'})
 
                 if name and snippet:
                     products.append(name.text)
-                    reviews.append(snippet.text)
-
+                    review_text = snippet.text
+                    reviews.append(review_text)
+                    
                     # Extracting the link with error handling
                     link = result.find('a')
                     if link and 'href' in link.attrs:
@@ -47,10 +56,15 @@ def scrape_search_results(brand_name):
                     else:
                         sources.append('N/A')
 
-                if rating:
-                    ratings.append(rating.text)
-                else:
-                    ratings.append('N/A')
+                    # Extract rating information
+                    if 'stars' in review_text.lower():
+                        rating = extract_star_rating_from_review(review_text)
+                        ratings.append(rating)
+                    elif rating_element:
+                        rating = extract_rating_from_element(rating_element)
+                        ratings.append(rating)
+                    else:
+                        ratings.append('N/A')
 
             try:
                 next_button = driver.find_element(By.CLASS_NAME, 'sb_pagN')
