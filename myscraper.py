@@ -3,35 +3,26 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException
 from bs4 import BeautifulSoup
 import pandas as pd
 import os
-
-def extract_star_rating_from_review(review_text):
-    # Use a regular expression to find star ratings in the review text
-    match = re.search(r'(\d+(\.\d+)?)\s*stars?', review_text, re.IGNORECASE)
-    if match:
-        return match.group(1)
-    return 'N/A'
+import time
 
 def scrape_search_results(brand_name):
     driver = webdriver.Chrome()
-    driver.get(f'https://www.bing.com/search?q={brand_name}')
+    driver.get(f'https://www.google.com/search?q={brand_name}')
 
     wait = WebDriverWait(driver, 20)
-    action_chains = ActionChains(driver)
 
     products = []
     sources = []
-    reviews = []
-    ratings = []
+    related_questions = []  # To store related questions
 
     try:
-        while True:
+        while len(products) < 10:
             try:
-                wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'b_algo')))
+                wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'div.g')))
             except TimeoutException:
                 print(f"Timeout: Search results not present within the specified time for the brand: {brand_name}")
                 break
@@ -39,36 +30,29 @@ def scrape_search_results(brand_name):
             content = driver.page_source
             soup = BeautifulSoup(content, 'html.parser')
 
-            for result in soup.find_all('li', {'class': 'b_algo'}):
-                name = result.find('h2')
-                snippet = result.find('div', {'class': 'b_caption'})
-                rating_element = result.find('div', {'class': 'b_vPanel'})
-
-                if name and snippet:
+            for result in soup.select('div.g')[:10]:  # Limit to 10 results
+                name = result.select_one('h3')
+                if name:
                     products.append(name.text)
-                    review_text = snippet.text
-                    reviews.append(review_text)
-                    
+    
                     # Extracting the link with error handling
-                    link = result.find('a')
+                    link = result.select_one('a')
                     if link and 'href' in link.attrs:
                         sources.append(link['href'])
                     else:
                         sources.append('N/A')
 
-                    # Extract rating information
-                    if 'stars' in review_text.lower():
-                        rating = extract_star_rating_from_review(review_text)
-                        ratings.append(rating)
-                    elif rating_element:
-                        rating = extract_rating_from_element(rating_element)
-                        ratings.append(rating)
-                    else:
-                        ratings.append('N/A')
+            # Wait for the related questions to be visible
+            wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'g-section-with-header[jsname="N8MzKe"]')))
+
+            # Extract related questions
+            for question in soup.select('g-section-with-header[jsname="N8MzKe"] g-expandable-container'):
+                question_text = question.select_one('div[jsname="r3Rhbd"]')
+                if question_text:
+                    related_questions.append(question_text.text)
 
             try:
-                next_button = driver.find_element(By.CLASS_NAME, 'sb_pagN')
-                action_chains.move_to_element(next_button).perform()
+                next_button = driver.find_element(By.ID, 'pnnext')
                 driver.execute_script("arguments[0].click();", next_button)
             except TimeoutException:
                 print("No more pages available.")
@@ -80,19 +64,15 @@ def scrape_search_results(brand_name):
     except KeyboardInterrupt:
         print("Scraping interrupted by user.")
     finally:
-        df = pd.DataFrame({'Product Name': products, 'Source': sources, 'Reviews': reviews, 'Ratings': ratings})
-        csv_filename = f'{brand_name}_search_results.csv'
-        xlsx_filename = f'{brand_name}_search_results.xlsx'
+        df = pd.DataFrame({'Product Name': products, 'Source': sources})
+        related_questions_df = pd.DataFrame({'Related Questions': related_questions})  # Creating DataFrame for related questions
 
-        # Save data to a CSV file
-        df.to_csv(csv_filename, index=False)
-
-        # Convert CSV to XLSX
-        df.to_excel(xlsx_filename, index=False)
-
-        # Clean up CSV file
-        os.remove(csv_filename)
+        # Save data to separate sheets in an Excel file
+        excel_filename = f'{brand_name}_search_results.xlsx'
+        with pd.ExcelWriter(excel_filename) as writer:
+            df.to_excel(writer, sheet_name='Search Results', index=False)
+            related_questions_df.to_excel(writer, sheet_name='Related Questions', index=False)
 
         driver.quit()
 
-        return xlsx_filename
+        return excel_filename
