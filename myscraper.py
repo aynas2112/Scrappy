@@ -43,13 +43,11 @@ def scrape_search_results(brand_name):
                         sources.append('N/A')
 
             # Wait for the related questions to be visible
-            wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'g-section-with-header[jsname="N8MzKe"]')))
+            wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[jsname="yEVEwb"]')))
 
             # Extract related questions
-            for question in soup.select('g-section-with-header[jsname="N8MzKe"] g-expandable-container'):
-                question_text = question.select_one('div[jsname="r3Rhbd"]')
-                if question_text:
-                    related_questions.append(question_text.text)
+            for question in soup.select('div[jsname="yEVEwb"]'):
+                related_questions.append(question.text)
 
             try:
                 next_button = driver.find_element(By.ID, 'pnnext')
