@@ -18,6 +18,7 @@ def scrape_search_results(brand_name):
     products = []
     sources = []
     related_questions = []  # To store related questions
+    additional_info = []  # To store additional information
 
     try:
         while len(products) < 10:
@@ -49,6 +50,11 @@ def scrape_search_results(brand_name):
             for question in soup.select('div[jsname="yEVEwb"]'):
                 related_questions.append(question.text)
 
+            # Extract additional information
+            wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'a.k8XOCe.R0xfCb.VCOFK.s8bAkb')))
+            for info_div in soup.select('a.k8XOCe.R0xfCb.VCOFK.s8bAkb'):
+                additional_info.append(info_div.text.strip())
+
             try:
                 next_button = driver.find_element(By.ID, 'pnnext')
                 driver.execute_script("arguments[0].click();", next_button)
@@ -64,12 +70,14 @@ def scrape_search_results(brand_name):
     finally:
         df = pd.DataFrame({'Product Name': products, 'Source': sources})
         related_questions_df = pd.DataFrame({'Related Questions': related_questions})  # Creating DataFrame for related questions
+        additional_info_df = pd.DataFrame({'Additional Info': additional_info})  # Creating DataFrame for additional information
 
         # Save data to separate sheets in an Excel file
         excel_filename = f'{brand_name}_search_results.xlsx'
         with pd.ExcelWriter(excel_filename) as writer:
             df.to_excel(writer, sheet_name='Search Results', index=False)
             related_questions_df.to_excel(writer, sheet_name='Related Questions', index=False)
+            additional_info_df.to_excel(writer, sheet_name='Additional Info', index=False)
 
         driver.quit()
 
